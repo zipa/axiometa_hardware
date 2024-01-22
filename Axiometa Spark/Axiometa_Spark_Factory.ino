@@ -59,5 +59,5 @@ void PWM()
 
 void interuptHandler()
 {
-  Serial.println("Hello from BLIST ONE Pro - you pressed a button");
+  Serial.println("Hello from Axiometa Spark - you pressed a button");
 }
