@@ -14,7 +14,7 @@ void setup()
 
 void loop()
 {
-  activityLED(); //if the surrounding light is too low, the led turns on 
+  activityLED();
 
   PWM(); //fades a PWM LED
 }
@@ -52,5 +52,5 @@ void PWM()
 
 void interuptHandler()
 {
-  Serial.println("Hello from Axiometa Spark - you pressed a button");
+  Serial.println("Hello from Axiometa Sparklet - you pressed a button");
 }
