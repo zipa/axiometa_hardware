@@ -5,8 +5,6 @@
 #include <DHT.h>
 #include <DHT_U.h>
 #include <DS3231.h>
-#include <arduinoFFT.h>
-
 
 #define SCREEN_WIDTH 128  // OLED display width, in pixels
 #define SCREEN_HEIGHT 64  // OLED display height, in pixels
@@ -104,18 +102,24 @@ void setup() {
   //setTime(); // run it only when needed disable on operation
 
   //for fun
-  ledStatus(studentLights_RED, 1);
+  //ledStatus(studentLights_RED, 1);
 }
 
 void loop() {
 
   demoAll();
 
+  //blinkLED(trafficLightsTwo_RED);
+
   //studentsFlat();
 
   //trafficLightOne();
 
   //trafficLightTwo();
+
+  //trafficLightSync_MANUAL();
+
+  //trafficLightSync_AUTO_SINGLE();
 
   //autoStreetLights();
 
@@ -137,30 +141,255 @@ void loop() {
 
   //setColorE2F14F();
 
-  displayMicIntensity();
+  //setColor40FF00();
+
+  //displayMicIntensity();
 }
 
 
 void demoAll() {
 
-  //autoStreetLights();
+  autoStreetLights();
   autoWindowLights();
-  trafficLightOne();
-  trafficLightTwo();
+  trafficLightSync_AUTO_SINGLE();
   studentsFlat();
 }
 
+
+void trafficLightSync_AUTO_SINGLE() {
+
+  static unsigned long previousMillis = 0;
+  static unsigned long intervalMillis = 0;  // Track time for 5-second interval
+  static int state = 0;
+  static int flashCount = 0;
+  static bool greenLightState = true;  // Track the state of the flashing green light
+  static bool delayOccurred = false;   // Track if delay has occurred
+
+  unsigned long currentMillis = millis();
+
+  // Check if 5 seconds have passed to simulate a button press
+  if (currentMillis - intervalMillis >= 5000) {
+    intervalMillis = currentMillis;
+    if (state == 0 && digitalRead(buttonTrafficLightOne) == HIGH) {
+      digitalWrite(buttonTrafficLightOne, LOW);  // Simulate button press for Light One
+    } else if (state == 4 && digitalRead(buttonTrafficLightTwo) == HIGH) {
+      digitalWrite(buttonTrafficLightTwo, LOW);  // Simulate button press for Light Two
+    }
+  }
+
+  switch (state) {
+    case 0:  // Initial state: Light One RED, Light Two GREEN
+      digitalWrite(trafficLightsOne_RED, HIGH);
+      digitalWrite(trafficLightsTwo_GRN, HIGH);
+      if (digitalRead(buttonTrafficLightOne) == LOW) {  // Button pressed for Light One
+        state = 1;                                      // Proceed with the sequence
+        previousMillis = currentMillis;
+      }
+      break;
+
+    case 1:                                         // Flashing GREEN light for Light Two
+      if (currentMillis - previousMillis >= 500) {  // Flash interval of 500ms
+        greenLightState = !greenLightState;
+        digitalWrite(trafficLightsTwo_GRN, greenLightState ? HIGH : LOW);
+        previousMillis = currentMillis;
+        flashCount++;
+
+        if (flashCount >= 6) {  // 3 flashes (ON/OFF counts as 1 flash)
+          flashCount = 0;
+          state = 2;
+          previousMillis = currentMillis;
+        }
+      }
+      break;
+
+    case 2:                                     // YELLOW light on Light Two for 1 second
+      digitalWrite(trafficLightsTwo_GRN, LOW);  // Ensure GREEN is off
+      digitalWrite(trafficLightsTwo_YLW, HIGH);
+      if (currentMillis - previousMillis >= 1000) {
+        digitalWrite(trafficLightsTwo_YLW, LOW);
+        digitalWrite(trafficLightsTwo_RED, HIGH);
+        delayOccurred = false;
+        state = 3;
+        previousMillis = currentMillis;
+      }
+      break;
+
+    case 3:                                                           // Delay before turning Light One GREEN
+      if (!delayOccurred && currentMillis - previousMillis >= 500) {  // 500ms delay
+        delayOccurred = true;
+        previousMillis = currentMillis;
+      } else if (delayOccurred && currentMillis - previousMillis >= 500) {
+        digitalWrite(trafficLightsOne_RED, LOW);
+        digitalWrite(trafficLightsOne_GRN, HIGH);  // Turn on GREEN for Light One
+        state = 4;
+      }
+      break;
+
+    case 4:                                             // Light One GREEN, Light Two RED - waiting for button press on Light Two
+      if (digitalRead(buttonTrafficLightTwo) == LOW) {  // Button pressed for Light Two
+        state = 5;
+        previousMillis = currentMillis;
+      }
+      break;
+
+    case 5:                                         // Flashing GREEN light for Light One
+      if (currentMillis - previousMillis >= 500) {  // Flash interval of 500ms
+        greenLightState = !greenLightState;
+        digitalWrite(trafficLightsOne_GRN, greenLightState ? HIGH : LOW);
+        previousMillis = currentMillis;
+        flashCount++;
+
+        if (flashCount >= 6) {  // 3 flashes (ON/OFF counts as 1 flash)
+          flashCount = 0;
+          state = 6;
+          previousMillis = currentMillis;
+        }
+      }
+      break;
+
+    case 6:                                     // YELLOW light on Light One for 1 second
+      digitalWrite(trafficLightsOne_GRN, LOW);  // Ensure GREEN is off
+      digitalWrite(trafficLightsOne_YLW, HIGH);
+      if (currentMillis - previousMillis >= 1000) {
+        digitalWrite(trafficLightsOne_YLW, LOW);
+        digitalWrite(trafficLightsOne_RED, HIGH);
+        delayOccurred = false;
+        state = 7;
+        previousMillis = currentMillis;
+      }
+      break;
+
+    case 7:                                                           // Delay before turning Light Two GREEN
+      if (!delayOccurred && currentMillis - previousMillis >= 500) {  // 500ms delay
+        delayOccurred = true;
+        previousMillis = currentMillis;
+      } else if (delayOccurred && currentMillis - previousMillis >= 500) {
+        digitalWrite(trafficLightsTwo_RED, LOW);
+        digitalWrite(trafficLightsTwo_GRN, HIGH);  // Turn on GREEN for Light Two
+        state = 0;                                 // Return to initial state
+      }
+      break;
+  }
+}
+
+void trafficLightSync_MANUAL() {
+  static unsigned long previousMillis = 0;
+  static int state = 0;
+  static int flashCount = 0;
+  static bool greenLightState = true;  // Track the state of the flashing green light
+  static bool delayOccurred = false;   // Track if delay has occurred
+
+  unsigned long currentMillis = millis();
+
+  switch (state) {
+    case 0:  // Initial state: Light One RED, Light Two GREEN
+      digitalWrite(trafficLightsOne_RED, HIGH);
+      digitalWrite(trafficLightsTwo_GRN, HIGH);
+      if (digitalRead(buttonTrafficLightOne) == LOW) {  // Button pressed for Light One
+        state = 1;                                      // Proceed with the sequence
+        previousMillis = currentMillis;
+      }
+      break;
+
+    case 1:                                         // Flashing GREEN light for Light Two
+      if (currentMillis - previousMillis >= 500) {  // Flash interval of 500ms
+        greenLightState = !greenLightState;
+        digitalWrite(trafficLightsTwo_GRN, greenLightState ? HIGH : LOW);
+        previousMillis = currentMillis;
+        flashCount++;
+
+        if (flashCount >= 6) {  // 3 flashes (ON/OFF counts as 1 flash)
+          flashCount = 0;
+          state = 2;
+          previousMillis = currentMillis;
+        }
+      }
+      break;
+
+    case 2:                                     // YELLOW light on Light Two for 1 second
+      digitalWrite(trafficLightsTwo_GRN, LOW);  // Ensure GREEN is off
+      digitalWrite(trafficLightsTwo_YLW, HIGH);
+      if (currentMillis - previousMillis >= 1000) {
+        digitalWrite(trafficLightsTwo_YLW, LOW);
+        digitalWrite(trafficLightsTwo_RED, HIGH);
+        delayOccurred = false;
+        state = 3;
+        previousMillis = currentMillis;
+      }
+      break;
+
+    case 3:                                                           // Delay before turning Light One GREEN
+      if (!delayOccurred && currentMillis - previousMillis >= 500) {  // 500ms delay
+        delayOccurred = true;
+        previousMillis = currentMillis;
+      } else if (delayOccurred && currentMillis - previousMillis >= 500) {
+        digitalWrite(trafficLightsOne_RED, LOW);
+        digitalWrite(trafficLightsOne_GRN, HIGH);  // Turn on GREEN for Light One
+        state = 4;
+      }
+      break;
+
+    case 4:                                             // Light One GREEN, Light Two RED - waiting for button press on Light Two
+      if (digitalRead(buttonTrafficLightTwo) == LOW) {  // Button pressed for Light Two
+        state = 5;
+        previousMillis = currentMillis;
+      }
+      break;
+
+    case 5:                                         // Flashing GREEN light for Light One
+      if (currentMillis - previousMillis >= 500) {  // Flash interval of 500ms
+        greenLightState = !greenLightState;
+        digitalWrite(trafficLightsOne_GRN, greenLightState ? HIGH : LOW);
+        previousMillis = currentMillis;
+        flashCount++;
+
+        if (flashCount >= 6) {  // 3 flashes (ON/OFF counts as 1 flash)
+          flashCount = 0;
+          state = 6;
+          previousMillis = currentMillis;
+        }
+      }
+      break;
+
+    case 6:                                     // YELLOW light on Light One for 1 second
+      digitalWrite(trafficLightsOne_GRN, LOW);  // Ensure GREEN is off
+      digitalWrite(trafficLightsOne_YLW, HIGH);
+      if (currentMillis - previousMillis >= 1000) {
+        digitalWrite(trafficLightsOne_YLW, LOW);
+        digitalWrite(trafficLightsOne_RED, HIGH);
+        delayOccurred = false;
+        state = 7;
+        previousMillis = currentMillis;
+      }
+      break;
+
+    case 7:                                                           // Delay before turning Light Two GREEN
+      if (!delayOccurred && currentMillis - previousMillis >= 500) {  // 500ms delay
+        delayOccurred = true;
+        previousMillis = currentMillis;
+      } else if (delayOccurred && currentMillis - previousMillis >= 500) {
+        digitalWrite(trafficLightsTwo_RED, LOW);
+        digitalWrite(trafficLightsTwo_GRN, HIGH);  // Turn on GREEN for Light Two
+        state = 0;                                 // Return to initial state
+      }
+      break;
+  }
+}
+
+
+
+
 void displayMicIntensity() {
 
-  static int peakLevels[5] = {0, 0, 0, 0, 0};  // Array to hold the peak levels for each bar
-  const int barWidth = 20;                     // Width of each bar
-  const int numBars = 5;                       // Number of bars
-  const int spacing = 5;                       // Spacing between bars
+  static int peakLevels[5] = { 0, 0, 0, 0, 0 };  // Array to hold the peak levels for each bar
+  const int barWidth = 20;                       // Width of each bar
+  const int numBars = 5;                         // Number of bars
+  const int spacing = 5;                         // Spacing between bars
 
   int micValue = analogRead(microphonePin);
 
   // Define different thresholds for each bar
-  int thresholds[numBars] = {100, 150, 200, 250, 300};
+  int thresholds[numBars] = { 100, 150, 200, 250, 300 };
 
   // Clear the display buffer
   display.clearDisplay();
@@ -184,14 +413,14 @@ void displayMicIntensity() {
 
     // Draw the bar and its peak level
     int x = i * (barWidth + spacing);
-    display.fillRect(x, SCREEN_HEIGHT - barHeight - 10, barWidth, barHeight, SSD1306_WHITE); // Adjusted for text
+    display.fillRect(x, SCREEN_HEIGHT - barHeight - 10, barWidth, barHeight, SSD1306_WHITE);  // Adjusted for text
     display.drawLine(x, SCREEN_HEIGHT - peakLevels[i] - 10, x + barWidth, SCREEN_HEIGHT - peakLevels[i] - 10, SSD1306_WHITE);
 
     // Draw the intensity value under each bar
     display.setTextSize(1);
     display.setTextColor(SSD1306_WHITE);
     display.setCursor(x, SCREEN_HEIGHT - 9);  // Position cursor under the bar
-    display.print(micValue);  // Display the current microphone value or the barHeight value
+    display.print(micValue);                  // Display the current microphone value or the barHeight value
   }
 
   // Update the display with all the drawn content
@@ -199,7 +428,7 @@ void displayMicIntensity() {
 }
 
 
-
+//Axiometa Colour
 void setColorE2F14F() {
   int redValue = 255 - 226;    // Inverted Red component of #E2F14F
   int greenValue = 255 - 241;  // Inverted Green component of #E2F14F
@@ -210,6 +439,16 @@ void setColorE2F14F() {
   analogWrite(studentLights_BLE, blueValue);
 }
 
+//NeonPurple
+void setColor40FF00() {
+  int redValue = 255 - 191;   // Inverted Red component of neon purple (191)
+  int greenValue = 255 - 0;   // Inverted Green component of neon purple (0)
+  int blueValue = 255 - 255;  // Inverted Blue component of neon purple (255)
+
+  analogWrite(studentLights_RED, redValue);
+  analogWrite(studentLights_GRN, greenValue);
+  analogWrite(studentLights_BLE, blueValue);
+}
 
 
 void scrollThroughColorWheel() {
@@ -432,22 +671,34 @@ void studentsFlat() {
 
     switch (randomColor) {
       case 0:
-        redValue = 255; greenValue = 0; blueValue = 0;  // Red
+        redValue = 255;
+        greenValue = 0;
+        blueValue = 0;  // Red
         break;
       case 1:
-        redValue = 0; greenValue = 255; blueValue = 0;  // Green
+        redValue = 0;
+        greenValue = 255;
+        blueValue = 0;  // Green
         break;
       case 2:
-        redValue = 0; greenValue = 0; blueValue = 255;  // Blue
+        redValue = 0;
+        greenValue = 0;
+        blueValue = 255;  // Blue
         break;
       case 3:
-        redValue = 255; greenValue = 255; blueValue = 0;  // Yellow (Red + Green)
+        redValue = 255;
+        greenValue = 255;
+        blueValue = 0;  // Yellow (Red + Green)
         break;
       case 4:
-        redValue = 255; greenValue = 0; blueValue = 255;  // Magenta (Red + Blue)
+        redValue = 255;
+        greenValue = 0;
+        blueValue = 255;  // Magenta (Red + Blue)
         break;
       case 5:
-        redValue = 0; greenValue = 255; blueValue = 255;  // Cyan (Green + Blue)
+        redValue = 0;
+        greenValue = 255;
+        blueValue = 255;  // Cyan (Green + Blue)
         break;
     }
 
@@ -472,10 +723,6 @@ void studentsFlat() {
     analogWrite(studentLights_BLE, 255);  // Off for active-low LEDs
   }
 }
-
-
-
-
 
 
 void blinkLED(int blinkingLEDPin) {
