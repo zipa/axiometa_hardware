@@ -6,7 +6,7 @@
 	(paper "A4")
 	(title_block
 		(title "Breadboost-C")
-		(date "2024-11-12")
+		(date "2025-01-04")
 		(company "Axiometa")
 	)
 	(lib_symbols
